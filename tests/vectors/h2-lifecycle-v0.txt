@@ -1,0 +1,6 @@
+half-close end_stream is not reset
+reset is not eof
+cancel is not eof
+second-connect does not replay ping
+loopback dials 0
+tunnel-failure has no dial target

@@ -1,0 +1,28 @@
+[package]
+name = "ariad-ffi"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license-file.workspace = true
+repository.workspace = true
+
+[lints.rust]
+unsafe_code = "allow"
+rust_2018_idioms = { level = "deny", priority = -1 }
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+
+[lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"
+
+[lib]
+crate-type = [ "lib", "cdylib", "staticlib" ]
+
+[dependencies]
+ariad-core.workspace = true
+ariad-embed.workspace = true
+ariad-engine = { workspace = true, features = [ "tls-rustls" ] }
+tokio = { workspace = true, features = [ "rt", "time" ] }

@@ -1,0 +1,6 @@
+:method CONNECT
+:authority example.com:443
+x-ariad-protocol-version 0
+x-ariad-h2-binding-version 0
+x-ariad-experimental-credential 1111111111111111111111111111111111111111111111111111111111111111
+body-after-200 is raw octets, not a private frame.

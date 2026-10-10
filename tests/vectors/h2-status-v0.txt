@@ -1,0 +1,6 @@
+200 ok
+401 authentication-denied
+403 authentication-denied
+502 target-connect-failed
+504 target-connect-failed
+404 protocol-violation

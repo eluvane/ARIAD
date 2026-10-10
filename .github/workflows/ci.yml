@@ -1,0 +1,94 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rust:
+    name: Rust
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt, clippy
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: taplo-cli,cargo-deny,cargo-machete
+      - run: cargo fmt --all -- --check --config-path .config/ariad/formatters/rustfmt.toml
+      - run: taplo fmt --check --config .config/ariad/formatters/taplo.toml
+      - run: taplo lint --config .config/ariad/formatters/taplo.toml
+      - run: cargo clippy --workspace --locked --all-targets -- -D warnings
+      - run: cargo machete --with-metadata
+      - run: cargo deny --config .config/ariad/security/cargo-deny.toml check
+      - run: cargo test --workspace --locked
+      - run: |
+          cargo run -p ariad-h2-connect --locked --offline
+          for attempt in $(seq 1 20); do
+            target/debug/ariad-h2-connect
+          done
+
+  policy-only:
+    name: Policy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: clippy
+      - run: cargo check -p ariad-engine --locked --no-default-features --lib
+      - run: cargo clippy -p ariad-engine --locked --no-default-features --all-targets -- -D warnings
+      - run: cargo test -p ariad-engine --locked --no-default-features
+
+  msrv-policy-only:
+    name: MSRV
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - run: cargo +1.88.0 check --locked --no-default-features -p ariad-core -p ariad-engine --lib
+
+  engine:
+    name: Engine (${{ matrix.profile }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - profile: h2
+            features: h2
+          - profile: rustls-h2
+            features: tls-rustls
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: clippy
+      - run: cargo clippy -p ariad-engine --locked --no-default-features --all-targets --features '${{ matrix.features }}' -- -D warnings
+      - run: cargo test -p ariad-engine --locked --no-default-features --features '${{ matrix.features }}'
+
+  c-consumer:
+    name: C ABI
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - name: Build the C ABI shared library
+        run: cargo build -p ariad-ffi --locked
+      - name: Compile and link the C11 consumer
+        run: >-
+          cc -std=c11 -Wall -Wextra -Wpedantic -Werror -pthread
+          -I crates/ffi/include crates/ffi/tests/consumer.c
+          -L "$PWD/target/debug" -Wl,-rpath,"$PWD/target/debug" -lariad_ffi
+          -o target/debug/ariad-c-consumer
+      - name: Run the linked consumer against local TLS, H2, and UDP fixtures
+        timeout-minutes: 10
+        env:
+          ARIAD_C_CONSUMER: ${{ github.workspace }}/target/debug/ariad-c-consumer
+        run: cargo test -p ariad-engine --locked --no-default-features --features tls-rustls --test c_consumer -- --ignored --nocapture

@@ -1,0 +1,238 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'MAJOR.MINOR.PATCH; leave empty for the next patch version'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CARGO_BUILD_JOBS: '2'
+  CARGO_TERM_COLOR: always
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.plan.outputs.tag }}
+      version: ${{ steps.plan.outputs.version }}
+      previous_tag: ${{ steps.plan.outputs.previous_tag }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      release_sha: ${{ steps.commit.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - name: Check the source branch
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo '::error::Run Release from the default branch.'
+            exit 1
+          fi
+      - name: Install the pinned Rust toolchain
+        run: rustup show active-toolchain
+      - name: Check source formatting and ABI definitions
+        run: |
+          cargo fmt --all -- --check --config-path .config/ariad/formatters/rustfmt.toml
+          python -B tools/generate_abi.py --check
+          python -B -m unittest discover -s tools -p 'test_*.py'
+      - name: Plan the release and synchronize package versions
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          cargo metadata --locked --no-deps --format-version 1 > "$RUNNER_TEMP/metadata.json"
+          git tag --list > "$RUNNER_TEMP/tags.txt"
+          python -B tools/release.py prepare \
+            --history "$RUNNER_TEMP/releases.json" --metadata "$RUNNER_TEMP/metadata.json" \
+            --tags "$RUNNER_TEMP/tags.txt" --version "$INPUT_VERSION" >> "$GITHUB_OUTPUT"
+          cargo metadata --locked --no-deps --format-version 1 > /dev/null
+      - name: Create the release source commit and bundle
+        id: commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.plan.outputs.tag }}
+        run: |
+          actor_id="$(gh api "users/$GITHUB_ACTOR" --jq .id)"
+          [[ "$actor_id" =~ ^[1-9][0-9]*$ ]]
+          git add Cargo.toml Cargo.lock README.md
+          git -c user.name="$GITHUB_ACTOR" \
+            -c user.email="$actor_id+$GITHUB_ACTOR@users.noreply.github.com" \
+            commit -m "Release $TAG"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git bundle create "$RUNNER_TEMP/release.bundle" HEAD
+      - uses: actions/upload-artifact@v7
+        with:
+          name: release-source-bundle
+          path: ${{ runner.temp }}/release.bundle
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  build:
+    name: Build (${{ matrix.target }})
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    env:
+      TARGET: ${{ matrix.target }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-source-bundle
+          path: ${{ runner.temp }}/release-source
+      - name: Check out the exact release source
+        run: |
+          git fetch "$RUNNER_TEMP/release-source/release.bundle" HEAD
+          [[ "$(git rev-parse FETCH_HEAD)" == "$RELEASE_SHA" ]]
+          git checkout --detach "$RELEASE_SHA"
+          rustup show active-toolchain
+          rustup target add "$TARGET"
+      - name: Check and test the native target
+        run: |
+          cargo clippy --workspace --locked --all-targets --target "$TARGET" -- -D warnings
+          cargo test --workspace --locked --release --target "$TARGET"
+      - name: Build the server and native libraries
+        run: cargo build --locked --release --target "$TARGET" -p ariad-server -p ariad-ffi
+      - name: Check the server and native ABI
+        env:
+          PYTHONPATH: bindings/python
+        run: |
+          suffix=''
+          library='libariad_ffi.so'
+          if [[ "$RUNNER_OS" == 'Windows' ]]; then
+            suffix='.exe'
+            library='ariad_ffi.dll'
+          elif [[ "$RUNNER_OS" == 'macOS' ]]; then
+            library='libariad_ffi.dylib'
+          fi
+          [[ "$("target/$TARGET/release/ariad-server$suffix" --version)" == "ariad-server $VERSION" ]]
+          export ARIAD_RELEASE_LIBRARY="target/$TARGET/release/$library"
+          python -B - <<'PY'
+          import os
+          from ariad import Feature, Library
+          native = Library(os.environ["ARIAD_RELEASE_LIBRARY"])
+          if native.supported(Feature.H2) is not True:
+              raise RuntimeError("The release library does not provide H2")
+          PY
+          cargo run --locked --release --target "$TARGET" -p ariad-h2-connect
+      - name: Package native outputs
+        run: |
+          python -B tools/release.py package --target "$TARGET" --tag "$TAG" \
+            --source-sha "$GITHUB_SHA" --release-sha "$RELEASE_SHA" --output "$RUNNER_TEMP/assets"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: assets-${{ matrix.target }}
+          path: ${{ runner.temp }}/assets/ariad-*
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+
+  publish:
+    name: Publish
+    needs: [prepare, build]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+      PREVIOUS_TAG: ${{ needs.prepare.outputs.previous_tag }}
+      RELEASE_SHA: ${{ needs.prepare.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.13'
+      - uses: actions/download-artifact@v8
+        with:
+          name: release-source-bundle
+          path: ${{ runner.temp }}/release-source
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: assets-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/release-assets
+      - name: Verify complete assets and publish
+        run: |
+          git fetch "$RUNNER_TEMP/release-source/release.bundle" HEAD
+          [[ "$(git rev-parse FETCH_HEAD)" == "$RELEASE_SHA" ]]
+          git checkout --detach "$RELEASE_SHA"
+          assets="$RUNNER_TEMP/release-assets"
+          python -B tools/release.py checksums --directory "$assets" --tag "$TAG"
+          remote_sha="$(git ls-remote origin "refs/tags/$TAG" | cut -f1)"
+          if [[ -n "$remote_sha" && "$remote_sha" != "$RELEASE_SHA" ]]; then
+            echo '::error::The release tag points to another commit.'
+            exit 1
+          fi
+          if [[ -z "$remote_sha" ]]; then
+            git tag "$TAG" "$RELEASE_SHA"
+            git -c credential.helper= -c 'credential.helper=!gh auth git-credential' push origin "refs/tags/$TAG"
+          fi
+          gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+          release_id="$(jq -r --arg tag "$TAG" '[.[][] | select(.tag_name == $tag)][0].id // empty' "$RUNNER_TEMP/releases.json")"
+          if [[ -z "$release_id" ]]; then
+            options=(-f "tag_name=$TAG" -f "target_commitish=$RELEASE_SHA")
+            if [[ -n "$PREVIOUS_TAG" ]]; then
+              options+=(-f "previous_tag_name=$PREVIOUS_TAG")
+            fi
+            gh api --method POST "repos/$GITHUB_REPOSITORY/releases/generate-notes" \
+              "${options[@]}" > "$RUNNER_TEMP/generated-notes.json"
+            python -B tools/release.py notes --directory "$assets" \
+              --generated "$RUNNER_TEMP/generated-notes.json" > "$RUNNER_TEMP/release-notes.md"
+            gh release create "$TAG" --draft --verify-tag --title "$TAG" \
+              --notes-file "$RUNNER_TEMP/release-notes.md" --prerelease=false
+            gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
+            release_id="$(jq -r --arg tag "$TAG" '[.[][] | select(.tag_name == $tag)][0].id // empty' "$RUNNER_TEMP/releases.json")"
+          fi
+          [[ "$release_id" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > "$RUNNER_TEMP/release.json"
+          if [[ "$(jq -r .draft "$RUNNER_TEMP/release.json")" == 'true' ]]; then
+            gh release upload "$TAG" "$assets"/* --clobber
+            gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > "$RUNNER_TEMP/release.json"
+          fi
+          python -B tools/release.py verify-assets --directory "$assets" --tag "$TAG" --release "$RUNNER_TEMP/release.json"
+          gh release edit "$TAG" --title "$TAG" --draft=false --prerelease=false --latest
+          gh release view "$TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"

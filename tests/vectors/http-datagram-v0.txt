@@ -1,0 +1,10 @@
+empty|0|-|00
+ping|0|70696e67|0070696e67
+binary|37|00ff80|2500ff80
+one-byte-max|63|-|3f
+two-byte-min|64|-|4040
+two-byte-max|16383|-|7fff
+four-byte-min|16384|-|80004000
+four-byte-max|1073741823|-|bfffffff
+eight-byte-min|1073741824|-|c000000040000000
+eight-byte-max|4611686018427387903|-|ffffffffffffffff

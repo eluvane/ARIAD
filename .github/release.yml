@@ -1,0 +1,18 @@
+changelog:
+  categories:
+    - title: Breaking changes
+      labels: [risk/breaking-change, breaking-change, breaking]
+    - title: Features
+      labels: [kind/feature, enhancement, feature]
+    - title: Fixes
+      labels: [kind/bug, bug, fix]
+    - title: Performance
+      labels: [kind/performance]
+    - title: Dependencies
+      labels: [kind/dependency, dependencies]
+    - title: Documentation
+      labels: [kind/docs, documentation]
+    - title: Maintenance and tests
+      labels: [kind/chore, kind/refactor, kind/test]
+    - title: Other changes
+      labels: ['*']

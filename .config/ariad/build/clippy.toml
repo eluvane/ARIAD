@@ -1,0 +1,7 @@
+# Clippy settings. Lint levels live in the workspace Cargo.toml.
+# Loaded through [env] in .cargo/config.toml.
+avoid-breaking-exported-api = true
+allowed-duplicate-crates = [  ]
+disallowed-names = [ "foo", "bar", "baz", "quux", "tmp" ]
+too-many-arguments-threshold = 7
+type-complexity-threshold = 250

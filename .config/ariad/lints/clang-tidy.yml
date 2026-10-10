@@ -1,0 +1,17 @@
+Checks: >-
+  -*,clang-analyzer-*,bugprone-*,cert-*,performance-*,portability-*,
+  misc-*,modernize-*,readability-braces-around-statements,
+  readability-inconsistent-declaration-parameter-name,
+  readability-misleading-indentation,readability-redundant-*,
+  readability-simplify-boolean-expr,readability-uniqueptr-delete-release,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -misc-include-cleaner,-modernize-macro-to-enum,
+  -modernize-use-using,-modernize-use-trailing-return-type
+WarningsAsErrors: '*'
+HeaderFilterRegex: '(crates.ffi.include|bindings.mobile.apple).'
+SystemHeaders: false
+CheckOptions:
+  bugprone-reserved-identifier.AllowedIdentifiers: '_POSIX_C_SOURCE'
+  cert-dcl37-c.AllowedIdentifiers: '_POSIX_C_SOURCE'
+  cert-dcl51-cpp.AllowedIdentifiers: '_POSIX_C_SOURCE'
+  misc-non-private-member-variables-in-classes.IgnoreClassesWithAllMemberVariablesBeingPublic: true

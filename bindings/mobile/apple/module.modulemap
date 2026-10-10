@@ -1,0 +1,4 @@
+module AriadC {
+    header "ariad_module.h"
+    export *
+}

@@ -1,0 +1,72 @@
+[package]
+name = "ariad-engine"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+license-file.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+h2 = [ "dep:bytes", "dep:h2", "dep:tokio" ]
+tls-rustls = [ "h2", "dep:rustls", "dep:tokio-rustls" ]
+tls-boring = [ "h2", "dep:boring", "dep:boring-sys", "dep:tokio-boring" ]
+h3 = [ "tls-boring", "dep:quiche", "dep:socket2", "dep:log" ]
+h3-log-info = [ "h3", "log/max_level_info" ]
+
+[package.metadata.cargo-machete]
+# The direct pin keeps both native TLS users on one BoringSSL build.
+ignored = [ "boring-sys" ]
+
+[dependencies]
+ariad-core.workspace = true
+boring = { version = "=5.2.0", default-features = false, optional = true }
+boring-sys = { version = "=5.2.0", default-features = false, optional = true }
+bytes = { version = "1", optional = true }
+h2 = { version = "0.4", optional = true }
+http = "1"
+log = { version = "0.4", optional = true }
+quiche = { version = "=0.30.0", default-features = false, features = [
+    "boringssl-boring-crate",
+], optional = true }
+rustls = { workspace = true, optional = true }
+socket2 = { version = "0.6", optional = true }
+tokio-rustls = { workspace = true, optional = true }
+tokio-boring = { version = "=5.2.0", default-features = false, optional = true }
+tokio = { workspace = true, features = [
+    "io-util",
+    "macros",
+    "net",
+    "rt",
+    "sync",
+    "time",
+], optional = true }
+
+[dev-dependencies]
+rcgen.workspace = true
+rustls.workspace = true
+tokio = { workspace = true, features = [ "io-util", "macros", "net", "rt", "sync", "time" ] }
+tokio-rustls = { workspace = true, features = [ "ring" ] }
+
+[[test]]
+name = "h2_tunnel"
+required-features = [ "h2" ]
+
+[[test]]
+name = "tls_negative"
+required-features = [ "tls-rustls" ]
+
+[[test]]
+name = "engine_session"
+required-features = [ "tls-rustls" ]
+
+[[test]]
+name = "c_consumer"
+required-features = [ "tls-rustls" ]
+
+[[test]]
+name = "native_transport"
+required-features = [ "h3-log-info" ]

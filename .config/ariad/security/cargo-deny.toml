@@ -1,0 +1,70 @@
+[graph]
+all-features = true
+
+[licenses]
+private = { ignore = false }
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "LicenseRef-MoL-1.0",
+]
+
+[[licenses.clarify]]
+crate = "ariad-core"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-engine"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-server"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-client-stream"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-loopback"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-h2-connect"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-embed"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[[licenses.clarify]]
+crate = "ariad-ffi"
+expression = "LicenseRef-MoL-1.0"
+license-files = [ { path = "../../LICENSE", hash = 0xd0bc54f0 } ]
+
+[bans]
+multiple-versions = "deny"
+wildcards = "deny"
+# Native build tools and quiche require these older versions alongside the workspace graph.
+skip = [
+    { crate = "shlex@1.3.0" },
+    { crate = "syn@2.0.119" },
+    { crate = "windows-sys@0.52.0" },
+    { crate = "windows-sys@0.59.0" },
+]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

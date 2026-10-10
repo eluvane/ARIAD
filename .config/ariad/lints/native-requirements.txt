@@ -1,0 +1,3 @@
+clang-format==21.1.5
+clang-tidy==21.1.6
+cppcheck==1.5.3

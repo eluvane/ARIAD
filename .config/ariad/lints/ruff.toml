@@ -1,0 +1,37 @@
+required-version = "==0.15.21"
+target-version = "py310"
+line-length = 100
+
+[lint]
+typing-extensions = false
+select = [
+    "E",
+    "F",
+    "I",
+    "UP",
+    "B",
+    "A",
+    "C4",
+    "DTZ",
+    "T10",
+    "ISC",
+    "ICN",
+    "PIE",
+    "PYI",
+    "RET",
+    "SIM",
+    "TID",
+    "INT",
+    "ARG",
+    "PTH",
+    "TC",
+    "RSE",
+    "FLY",
+    "PERF",
+    "S",
+    "RUF",
+    "PGH",
+]
+
+[lint.isort]
+known-first-party = [ "ariad" ]

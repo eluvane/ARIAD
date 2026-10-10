@@ -1,0 +1,21 @@
+name: Native
+
+on:
+  workflow_dispatch:
+
+jobs:
+  native:
+    name: Native (${{ matrix.features }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        features: [tls-boring, h3, h3-log-info, "tls-rustls,h3-log-info"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: clippy
+      - run: cargo clippy -p ariad-engine --locked --no-default-features --all-targets --features '${{ matrix.features }}' -- -D warnings
+      - run: cargo test -p ariad-engine --locked --no-default-features --features '${{ matrix.features }}'

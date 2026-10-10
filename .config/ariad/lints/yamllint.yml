@@ -1,0 +1,30 @@
+---
+extends: default
+
+ignore: |
+  target/**
+  **/target/**
+
+rules:
+  braces:
+    max-spaces-inside: 1
+  brackets:
+    max-spaces-inside: 1
+  colons:
+    max-spaces-after: 1
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: enable
+  document-start: disable
+  empty-lines:
+    max: 2
+    max-end: 1
+  indentation:
+    spaces: 2
+    indent-sequences: consistent
+  line-length:
+    max: 140
+    level: warning
+  truthy:
+    allowed-values: ["true", "false", "on", "off"]
+    check-keys: false

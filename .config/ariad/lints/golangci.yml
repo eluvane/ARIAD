@@ -1,0 +1,72 @@
+version: "2"
+
+run:
+  timeout: 3m
+  concurrency: 2
+  modules-download-mode: readonly
+
+linters:
+  default: none
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - durationcheck
+    - errcheck
+    - errorlint
+    - exhaustive
+    - fatcontext
+    - forcetypeassert
+    - gocheckcompilerdirectives
+    - gocritic
+    - gosec
+    - govet
+    - ineffassign
+    - makezero
+    - misspell
+    - nakedret
+    - nilerr
+    - nilnesserr
+    - nolintlint
+    - nosprintfhostport
+    - perfsprint
+    - predeclared
+    - reassign
+    - recvcheck
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - wastedassign
+  settings:
+    errcheck:
+      check-type-assertions: true
+      check-blank: true
+    govet:
+      enable-all: true
+    gocritic:
+      disabled-checks:
+        - dupImport
+        - uncheckedInlineErr
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+    staticcheck:
+      checks: [all]
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+  exclusions:
+    generated: disable
+    presets: []
+    paths: []
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
+
+formatters:
+  enable:
+    - gofmt

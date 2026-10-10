@@ -1,0 +1,21 @@
+rules:
+  - id: ariad-rust-no-unwrap-in-src
+    languages: [rust]
+    severity: ERROR
+    message: "Avoid unwrap/expect outside tests; propagate typed errors instead."
+    paths:
+      include:
+        - "**/crates/**/src/**"
+      exclude:
+        - "**/.kilo/**"
+        - "**/target/**"
+    patterns:
+      - pattern-either:
+          - pattern: $X.unwrap()
+          - pattern: $X.expect($MSG)
+      - pattern-not:
+          pattern-inside: |
+            #[cfg(test)]
+            mod $_ {
+              ...
+            }

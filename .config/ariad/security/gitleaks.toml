@@ -1,0 +1,10 @@
+title = "Ariad gitleaks policy"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build output is not a secret source."
+paths = [
+    '''^target/''',
+]
